@@ -75,11 +75,16 @@ jobs:
           Set-Content "$vault\Escalation.md" "# Escalation`n`nwake the on-call`n" -Encoding utf8
           Set-Content "$vault\Thai.md" "# Thai`n`nสถาบันวิจัยแห่งประเทศไทยประกาศผลการศึกษา`n" -Encoding utf8
           Push-Location $vault
-          $found = samong search queue
+          # Out-String, because these commands print several lines and PowerShell's
+          # -match against an *array* filters it instead of returning a boolean:
+          # the non-matching lines then make -notmatch look true even when the
+          # match is right there. That is how the first run of this job "failed"
+          # while search was working perfectly.
+          $found = (samong search queue | Out-String)
           if ($found -notmatch "Runbook") { throw "search did not find the note: $found" }
-          $links = samong links Runbook
+          $links = (samong links Runbook | Out-String)
           if ($links -notmatch "Escalation") { throw "the wikilink did not resolve: $links" }
-          $thai = samong search "ประเทศไทย"
+          $thai = (samong search "ประเทศไทย" | Out-String)
           if ($thai -notmatch "Thai") { throw "Thai segmentation failed — is the dictionary in the binary? $thai" }
           Pop-Location
           "search, links and Thai segmentation all work"
