@@ -1,0 +1,76 @@
+name: Bump
+
+# Polls, for the same reason the Homebrew tap does: a repository_dispatch from
+# upstream would be instant but needs a long-lived personal access token stored in
+# two places, and a manifest lagging a few hours is a far smaller problem than a
+# leaked token. Use workflow_dispatch when it needs to be immediate.
+on:
+  schedule:
+    - cron: "37 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Specific version to pin, e.g. 0.4.0. Blank means the latest release."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rewrite the manifest if upstream moved
+        id: bump
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            python bump.py --version "${{ inputs.version }}"
+          else
+            python bump.py
+          fi
+          if git diff --quiet -- bucket/samong.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "already current"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "version=$(python -c "import json;print(json.load(open('bucket/samong.json'))['version'])")" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Installed and exercised before the commit. A bucket whose main branch holds
+      # a manifest that does not install is worse than one that lags.
+      - name: The rewritten manifest must install
+        if: steps.bump.outputs.changed == 'true'
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy RemoteSigned -Scope Process -Force
+          Invoke-RestMethod -Uri https://get.scoop.sh -OutFile install.ps1
+          .\install.ps1 -RunAsAdmin
+          $env:PATH = "$env:USERPROFILE\scoop\shims;$env:PATH"
+          scoop install .\bucket\samong.json
+          samong --version
+          samong-server --version
+
+      - name: Commit
+        if: steps.bump.outputs.changed == 'true'
+        shell: bash
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bucket/samong.json
+          printf '%s\n\n%s\n' \
+            "chore: samong $VERSION" \
+            "version, url, hash and extract_dir together. Hash from the .sha256 published beside the archive; installed on this runner before the commit." \
+            > msg.txt
+          git commit -F msg.txt
+          rm msg.txt
+          git push

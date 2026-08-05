@@ -1,0 +1,85 @@
+name: Manifest
+
+# Scoop is not installed on this project's development machine and cannot be, so
+# the manifest is verified here: installed for real on a Windows runner, with the
+# shims run afterwards.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  install:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The manifest is valid JSON with the fields Scoop needs
+        shell: pwsh
+        run: |
+          $m = Get-Content bucket/samong.json -Raw | ConvertFrom-Json
+          foreach ($f in @("version","description","homepage","license","bin")) {
+            if (-not $m.$f) { throw "manifest is missing $f" }
+          }
+          $arch = $m.architecture."64bit"
+          foreach ($f in @("url","hash","extract_dir")) {
+            if (-not $arch.$f) { throw "architecture.64bit is missing $f" }
+          }
+          if ($arch.hash -notmatch '^[a-f0-9]{64}$') { throw "hash is not a sha256" }
+          # extract_dir has to match the directory inside the zip, and the zip name
+          # carries the version. Mismatch here means every shim points at nothing.
+          if ($arch.url -notlike "*$($m.version)*") { throw "url does not name version $($m.version)" }
+          if ($arch.extract_dir -ne "samong-v$($m.version)-x86_64-windows") {
+            throw "extract_dir $($arch.extract_dir) does not match the archive layout"
+          }
+          "manifest fields consistent for $($m.version)"
+
+      - name: Install Scoop
+        shell: pwsh
+        run: |
+          # Runners are administrators and Scoop refuses that without the flag.
+          Set-ExecutionPolicy RemoteSigned -Scope Process -Force
+          Invoke-RestMethod -Uri https://get.scoop.sh -OutFile install.ps1
+          .\install.ps1 -RunAsAdmin
+          "$env:USERPROFILE\scoop\shims" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      # Installing the manifest file from this checkout, not from the published
+      # bucket, so a pull request tests the change in the branch.
+      - name: Install samong from the manifest in this checkout
+        shell: pwsh
+        run: scoop install .\bucket\samong.json
+
+      - name: Every declared shim exists and answers
+        shell: pwsh
+        run: |
+          foreach ($b in @("samong","samong-server","samong-mcp","samong-app")) {
+            $cmd = Get-Command $b -ErrorAction SilentlyContinue
+            if (-not $cmd) { throw "$b was not shimmed onto PATH" }
+            "  $b -> $($cmd.Source)"
+          }
+          samong --version
+          samong-server --version
+
+      # The point of the program, not just that it launches: a word inside a note
+      # is findable, and Thai — which has no spaces between words — is segmented by
+      # the dictionary embedded in the binary. That last assertion fails if a
+      # release was built without it.
+      - name: It actually finds notes
+        shell: pwsh
+        run: |
+          $env:SAMONG_CONFIG_DIR = "$env:RUNNER_TEMP\samong-config"
+          $vault = "$env:RUNNER_TEMP\vault"
+          New-Item -ItemType Directory -Force $vault | Out-Null
+          Set-Content "$vault\Runbook.md" "# Runbook`n`nwhen the queue backs up, drain it`n`nSee [[Escalation]].`n" -Encoding utf8
+          Set-Content "$vault\Escalation.md" "# Escalation`n`nwake the on-call`n" -Encoding utf8
+          Set-Content "$vault\Thai.md" "# Thai`n`nสถาบันวิจัยแห่งประเทศไทยประกาศผลการศึกษา`n" -Encoding utf8
+          Push-Location $vault
+          $found = samong search queue
+          if ($found -notmatch "Runbook") { throw "search did not find the note: $found" }
+          $links = samong links Runbook
+          if ($links -notmatch "Escalation") { throw "the wikilink did not resolve: $links" }
+          $thai = samong search "ประเทศไทย"
+          if ($thai -notmatch "Thai") { throw "Thai segmentation failed — is the dictionary in the binary? $thai" }
+          Pop-Location
+          "search, links and Thai segmentation all work"

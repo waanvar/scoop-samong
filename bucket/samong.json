@@ -1,0 +1,43 @@
+{
+    "version": "0.3.9",
+    "description": "Local-first, Obsidian-compatible knowledge base. Full-text search that handles languages written without spaces between words, a wikilink graph, and an MCP server for AI agents. Nothing leaves the machine.",
+    "homepage": "https://samong.dev",
+    "license": "Apache-2.0",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/waanvar/samong/releases/download/v0.3.9/samong-v0.3.9-x86_64-windows.zip",
+            "hash": "87f02b16fe4b6bc2f5518d3b743ce0cb9213eef4b34acef84a28342a8d678a65",
+            "extract_dir": "samong-v0.3.9-x86_64-windows"
+        }
+    },
+    "bin": [
+        "samong.exe",
+        "samong-server.exe",
+        "samong-mcp.exe",
+        "samong-app.exe"
+    ],
+    "notes": [
+        "Notes live in a folder you choose; nothing leaves this machine.",
+        "",
+        "Point it at a folder and open the interface:",
+        "  samong vault add notes $env:USERPROFILE\\Documents\\Notes",
+        "  samong-server start",
+        "",
+        "Or run samong-app for the same thing with no arguments — it creates",
+        "Documents\\Samong on first use and opens your browser."
+    ],
+    "checkver": {
+        "github": "https://github.com/waanvar/samong"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/waanvar/samong/releases/download/v$version/samong-v$version-x86_64-windows.zip",
+                "extract_dir": "samong-v$version-x86_64-windows"
+            }
+        },
+        "hash": {
+            "url": "$url.sha256"
+        }
+    }
+}
