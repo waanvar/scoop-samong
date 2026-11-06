@@ -1,13 +1,13 @@
 {
-    "version": "0.6.1",
+    "version": "0.7.0",
     "description": "Local-first, Obsidian-compatible knowledge base. Full-text search that handles languages written without spaces between words, a wikilink graph, and an MCP server for AI agents. Nothing leaves the machine.",
     "homepage": "https://samong.dev",
     "license": "Apache-2.0",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/waanvar/samong/releases/download/v0.6.1/samong-v0.6.1-x86_64-windows.zip",
-            "hash": "0b2f716855ef730a307b2477be13517d44395aef9d6b0a1d8a4a5e81b7d7a3ec",
-            "extract_dir": "samong-v0.6.1-x86_64-windows"
+            "url": "https://github.com/waanvar/samong/releases/download/v0.7.0/samong-v0.7.0-x86_64-windows.zip",
+            "hash": "1fcf31edf05bfb232d6c57daf2f581564c817f15676eba0c2c32a524fbcad802",
+            "extract_dir": "samong-v0.7.0-x86_64-windows"
         }
     },
     "bin": [
